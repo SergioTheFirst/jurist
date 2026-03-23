@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Ввод обращения — LegalDesk{% endblock %}
+{% block content %}
+<h2>Ввод текста обращения</h2>
+<form method="post" action="/">
+    <textarea name="text" rows="10" placeholder="Вставьте текст обращения..."></textarea>
+    <button type="submit">Анонимизировать</button>
+</form>
+{% endblock %}
