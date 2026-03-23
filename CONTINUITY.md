@@ -24,7 +24,7 @@ Claude Code не помнит предыдущие сессии. Этот фай
 - [x] CLAUDE.md, CONSTITUTION.md, AGENTS.md, CHANGELOG.md
 
 ### Фаза 1 — Anonymizer ⏳
-- [ ] regex_patterns.py: паспорт, email, р/с, адрес
+- [ ] regex_patterns.py: паспорт, email, р/с, адрес, номер автомобиля, номер телефона
 - [ ] llm_client.py: вызов Ollama API
 - [ ] anonymizer.py: объединение LLM + regex
 - [ ] mapping.py: обратная подстановка
