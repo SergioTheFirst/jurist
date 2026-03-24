@@ -1,4 +1,4 @@
-.PHONY: install lint test run
+.PHONY: install lint test run check
 
 install:
 	pip install -e ".[dev]"
@@ -11,4 +11,7 @@ test:
 	python -m pytest
 
 run:
-	flask --app legaldesk.web.app run --debug
+	flask --app legaldesk.web.app run --host 127.0.0.1 --port 5000 --debug
+
+check: lint test
+	@echo "All checks passed"

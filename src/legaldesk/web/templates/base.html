@@ -1,16 +1,27 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}LegalDesk{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='pico.min.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}LegalDesk{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <main class="container">
-        <h1>LegalDesk</h1>
-        {% block content %}{% endblock %}
-    </main>
+  <header class="app-header">
+    <div class="app-header__inner">
+      <div class="app-header__logo">&#9878; LegalDesk</div>
+      <nav class="app-header__nav">
+        <a href="/">Новый запрос</a>
+        <a href="/health">Статус системы</a>
+      </nav>
+    </div>
+  </header>
+  <main class="app-container">
+    {% block step_indicator %}{% endblock %}
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="app-footer">
+    LegalDesk v0.2.0 &mdash; АРМ Юриста
+  </footer>
 </body>
 </html>

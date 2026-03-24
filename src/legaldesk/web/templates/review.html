@@ -1,89 +1,114 @@
 {% extends "base.html" %}
 {% block title %}Проверка замен — LegalDesk{% endblock %}
+
+{% block step_indicator %}
+<div class="step-indicator">
+  <div class="step step--done">
+    <div class="step__circle">1</div>
+    <div class="step__label">Ввод текста</div>
+  </div>
+  <div class="step step--active">
+    <div class="step__connector"></div>
+    <div class="step__circle">2</div>
+    <div class="step__label">Проверка замен</div>
+  </div>
+  <div class="step">
+    <div class="step__connector"></div>
+    <div class="step__circle">3</div>
+    <div class="step__label">Результат</div>
+  </div>
+</div>
+{% endblock %}
+
 {% block content %}
-<h2>Проверка замен</h2>
+<form method="post" action="/approve">
 
 {% if degraded %}
-<div class="warning-banner">
-    ⚠ LLM недоступна. Анонимизация выполнена только regex-паттернами.
-    Внимательно проверьте замены вручную.
+<div class="alert alert--warning">
+  <strong>&#9888; LLM недоступна.</strong> Работают только regex-детекторы.
+  Контекстно-зависимые данные (ФИО в падежах, адреса) могли быть пропущены.
+  Проверьте замены тщательнее.
 </div>
 {% endif %}
 
 {% if error %}
-<p class="error">{{ error }}</p>
+<div class="alert alert--danger">{{ error }}</div>
 {% endif %}
 
-<form method="post" action="/approve">
-<div class="columns">
-    <div>
-        <h3>Исходный текст</h3>
-        <div class="text-display">{{ original_html }}</div>
-    </div>
-    <div>
-        <h3>Анонимизированный текст</h3>
-        <div class="text-display">{{ anonymized_html }}</div>
-    </div>
+<div class="stats-bar">
+  <div class="stat">Найдено замен: <span class="stat__value">{{ spans|length }}</span></div>
+  <div class="stat">Regex: <span class="stat__value">{{ regex_count }}</span></div>
+  <div class="stat">LLM: <span class="stat__value">{{ llm_count }}</span></div>
 </div>
 
-<h3>Обнаруженные ПДн</h3>
-<table>
+<div class="split-view">
+  <div class="split-view__panel">
+    <div class="split-view__header">Оригинальный текст</div>
+    <div class="split-view__body">{{ highlighted_original }}</div>
+  </div>
+  <div class="split-view__panel">
+    <div class="split-view__header">Очищенный текст</div>
+    <div class="split-view__body">{{ highlighted_anonymized }}</div>
+  </div>
+</div>
+
+<div class="card" style="margin-top: 24px;">
+  <h3>Таблица замен</h3>
+  <p style="font-size: 13px; color: var(--color-text-muted); margin-bottom: 12px;">
+    Снимите отметку чтобы вернуть оригинальное значение в текст.
+  </p>
+  <table class="replacements-table">
     <thead>
-        <tr>
-            <th><input type="checkbox" id="select-all" checked></th>
-            <th>Текст</th>
-            <th>Тип</th>
-            <th>Источник</th>
-        </tr>
+      <tr>
+        <th><input type="checkbox" id="select-all" checked></th>
+        <th>Токен</th>
+        <th>Оригинал</th>
+        <th>Тип</th>
+        <th>Источник</th>
+      </tr>
     </thead>
     <tbody>
-    {% for span in spans %}
-        <tr>
-            <td>
-                <input type="checkbox" name="selected_span_ids"
-                       value="{{ span.span_id }}" checked>
-            </td>
-            <td>{{ span.text }}</td>
-            <td>{{ span.entity_type.value }}</td>
-            <td>{{ span.source }}</td>
-        </tr>
-    {% endfor %}
+      {% for span in spans %}
+      <tr>
+        <td><input type="checkbox" name="selected_span_ids" value="{{ span.span_id }}" checked></td>
+        <td><code>{{ reverse_mapping.get(span.text, '') }}</code></td>
+        <td>{{ span.text }}</td>
+        <td>{{ span.entity_type.value }}</td>
+        <td><span class="badge badge--{{ span.source }}">{{ span.source }}</span></td>
+      </tr>
+      {% endfor %}
     </tbody>
-</table>
+  </table>
 
-<details>
-    <summary>Добавить замену вручную</summary>
-    <fieldset>
-        <label>Текст для замены
-            <input type="text" name="manual_text" placeholder="Введите фрагмент текста">
-        </label>
-        <label>Тип ПДн
-            <select name="manual_type">
-                <option value="">— выберите —</option>
-                {% for et in entity_types %}
-                <option value="{{ et }}">{{ et }}</option>
-                {% endfor %}
-            </select>
-        </label>
-    </fieldset>
-</details>
+  <div class="manual-add">
+    <input name="manual_text" placeholder="Текст для ручной замены">
+    <select name="manual_type">
+      {% for et in entity_types %}<option value="{{ et }}">{{ et }}</option>{% endfor %}
+    </select>
+    <span style="font-size: 13px; color: var(--color-text-muted);">Применится при одобрении</span>
+  </div>
+</div>
 
 {% if degraded %}
-<label>
-    <input type="checkbox" name="degraded_confirm">
-    Я проверил(а) замены вручную и подтверждаю корректность
-</label>
+<div class="checkbox-row" style="margin-top: 16px;">
+  <input type="checkbox" name="degraded_confirm" id="dc">
+  <label for="dc"><strong>Я подтверждаю что проверил все замены вручную</strong></label>
+</div>
 {% endif %}
 
-<button type="submit">Отправить на анализ</button>
+<div style="margin-top: 24px; display: flex; justify-content: space-between;">
+  <a href="/new" class="btn btn--secondary">&larr; Вернуться к вводу</a>
+  <button type="submit" class="btn btn--primary btn--lg">Одобрить и отправить на анализ &rarr;</button>
+</div>
+
 </form>
 
 <script>
 document.getElementById("select-all").addEventListener("change", function() {
-    var checked = this.checked;
-    document.querySelectorAll('input[name="selected_span_ids"]').forEach(function(cb) {
-        cb.checked = checked;
-    });
+  var checked = this.checked;
+  document.querySelectorAll('input[name="selected_span_ids"]').forEach(function(cb) {
+    cb.checked = checked;
+  });
 });
 </script>
 {% endblock %}

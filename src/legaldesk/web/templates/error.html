@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ code }} — LegalDesk{% endblock %}
+{% block content %}
+<div class="error-page">
+  <div class="error-page__code">{{ code }}</div>
+  <div class="error-page__message">{{ message }}</div>
+  <a href="/" class="btn btn--primary">На главную</a>
+</div>
+{% endblock %}

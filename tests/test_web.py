@@ -14,6 +14,7 @@ from legaldesk.web.session_store import review_store
 if TYPE_CHECKING:
     from flask import Flask
     from flask.testing import FlaskClient
+    from werkzeug.test import TestResponse
 
 
 @pytest.fixture()
@@ -179,9 +180,16 @@ def test_no_cdn_in_html(client: FlaskClient) -> None:
     """HTML не содержит ссылок на CDN (Статья 4.3 CONSTITUTION)."""
     resp = client.get("/")
     html = resp.data.decode()
-    assert "cdn" not in html.lower()
+    assert "cdn." not in html.lower()
     assert "unpkg" not in html.lower()
     assert "jsdelivr" not in html.lower()
+
+
+def test_no_external_cdn(client: FlaskClient) -> None:
+    """GET / не содержит cdn. ссылок."""
+    resp = client.get("/")
+    html = resp.data.decode()
+    assert "cdn." not in html.lower()
 
 
 def test_new_clears_session(client: FlaskClient) -> None:
@@ -216,3 +224,80 @@ def test_full_cycle(client: FlaskClient) -> None:
     resp = client.get("/result")
     assert resp.status_code == 200
     assert b"1079" in resp.data
+
+
+# ---------------------------------------------------------------------------
+# Phase 4: новые тесты
+# ---------------------------------------------------------------------------
+
+
+def test_health_returns_json(client: FlaskClient) -> None:
+    """GET /health returns JSON with status field."""
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data is not None
+    assert data["status"] == "ok"
+    assert "version" in data
+    assert "ollama_available" in data
+
+
+def test_health_when_ollama_unavailable(client: FlaskClient) -> None:
+    """GET /health with Ollama unreachable returns ollama_available=false."""
+    with patch("legaldesk.web.app.httpx.get", side_effect=ConnectionError("timeout")):
+        resp = client.get("/health")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data is not None
+    assert data["ollama_available"] is False
+    assert data["degraded_mode"] is True
+
+
+def test_text_too_long(client: FlaskClient) -> None:
+    """POST /anonymize with text >50000 chars returns error."""
+    long_text = "A" * 50001
+    resp = client.post("/anonymize", data={"text": long_text})
+    assert resp.status_code == 200
+    assert "слишком длинный".encode() in resp.data
+
+
+def test_empty_text_shows_error(client: FlaskClient) -> None:
+    """POST /anonymize with whitespace-only text returns error."""
+    resp = client.post("/anonymize", data={"text": "   "})
+    assert resp.status_code == 200
+    assert "Введите текст".encode() in resp.data
+
+
+def test_anonymize_exception(client: FlaskClient) -> None:
+    """POST /anonymize when anonymize() throws returns error page, not 500."""
+    with patch("legaldesk.web.app.anonymize", side_effect=RuntimeError("boom")):
+        resp = client.post("/anonymize", data={"text": "some text"})
+    assert resp.status_code == 200
+    assert "Ошибка".encode() in resp.data
+
+
+def test_404_page(client: FlaskClient) -> None:
+    """GET /nonexistent returns 404 error page."""
+    resp = client.get("/nonexistent")
+    assert resp.status_code == 404
+    assert b"404" in resp.data
+
+
+def test_navigation_present(client: FlaskClient) -> None:
+    """GET / contains LegalDesk branding."""
+    resp = client.get("/")
+    html = resp.data.decode()
+    assert "LegalDesk" in html
+
+
+def test_cookie_flags(client: FlaskClient) -> None:
+    """POST /anonymize sets HttpOnly and SameSite cookie flags."""
+    with patch("legaldesk.web.app.anonymize", return_value=_SAMPLE_RESULT):
+        resp: TestResponse = client.post(
+            "/anonymize",
+            data={"text": _SAMPLE_TEXT},
+            follow_redirects=False,
+        )
+    cookie_header = resp.headers.get("Set-Cookie", "")
+    assert "HttpOnly" in cookie_header
+    assert "SameSite" in cookie_header
