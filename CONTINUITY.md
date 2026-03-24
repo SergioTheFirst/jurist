@@ -1,64 +1,39 @@
-# CONTINUITY.md — Контекст для продолжения работы
+# CONTINUITY — журнал прогресса LegalDesk
 
-## Зачем этот файл
-Claude Code не помнит предыдущие сессии. Этот файл — передача контекста между сессиями. Обновляй его в конце каждой рабочей сессии.
+Файл обновляется при завершении каждого шага. Используется для восстановления контекста между сессиями.
 
----
+## Фаза 0: Фундамент — ЗАВЕРШЕНА
 
-## Текущее состояние
+**Что сделано:**
+- pyproject.toml (ruff, mypy strict, pytest-cov, flask, pydantic, httpx, pydantic-settings)
+- Makefile: install, lint, test, run
+- .github/workflows/ci.yml
+- Структура каталогов src/legaldesk/{anonymizer,legal_engine,web}
+- Все __init__.py, заглушки модулей
+- 13 базовых тестов — зелёные
 
-**Фаза:** 0 (Фундамент) — ЗАВЕРШЕНА ✅
-**Следующая:** Фаза 1 (Anonymizer)
-**Дата последнего обновления:** 2026-03-23
-**Ветка:** main
+## Фаза 1: Anonymizer — В ПРОЦЕССЕ
 
-## Что сделано
+### Шаг 2: Typed Anonymizer — ЗАВЕРШЁН
 
-### Фаза 0 — Фундамент ✅
-- [x] Структура каталогов
-- [x] pyproject.toml (ruff, mypy strict, pytest-cov, flask, pydantic, httpx)
-- [x] Makefile (install, lint, test, run)
-- [x] CI: GitHub Actions
-- [x] Заглушки модулей
-- [x] 13 тестов, покрытие 87%
-- [x] CLAUDE.md, CONSTITUTION.md, AGENTS.md, CHANGELOG.md
+**Файлы созданы/изменены:**
+- `src/legaldesk/anonymizer/models.py` — EntityType (23 типа), DetectedSpan, AnonymizationResult
+- `src/legaldesk/anonymizer/config.py` — AnonymizerConfig (pydantic-settings, env_prefix LEGALDESK_)
+- `src/legaldesk/anonymizer/regex_patterns.py` — 12 паттернов (INN, SNILS, PHONE, PASSPORT, EMAIL, BANK_ACCOUNT, BANK_CARD, BIK, LICENSE_PLATE, VIN, INSURANCE_POLICY, VEHICLE_REGISTRATION)
+- `src/legaldesk/anonymizer/resolver.py` — resolve_overlaps (покрытие > LLM-приоритет)
+- `src/legaldesk/anonymizer/llm_client.py` — OllamaClient.detect (sync httpx, fallback на [], никогда не логирует ПДн)
+- `src/legaldesk/anonymizer/anonymizer.py` — anonymize(), deanonymize(), anonymize_with_regex()
 
-### Фаза 1 — Anonymizer ⏳
-- [ ] regex_patterns.py: паспорт, email, р/с, адрес, номер автомобиля, номер телефона
-- [ ] llm_client.py: вызов Ollama API
-- [ ] anonymizer.py: объединение LLM + regex
-- [ ] mapping.py: обратная подстановка
-- [ ] Тесты: 0 утечек ПДн в очищенном тексте
+**Тесты:**
+- `tests/test_resolver.py` — 7 тестов overlap resolver
+- `tests/test_regex_patterns.py` — 30+ тестов паттернов
+- `tests/test_anonymizer.py` — 13 тестов (roundtrip, no-leaks, degraded, mock LLM)
+- `tests/test_config.py` — 4 теста конфигурации
 
-### Фаза 2 — Web UI 🔲
-- [ ] Экран 1: ввод текста (textarea)
-- [ ] Экран 2: проверка замен (diff-view)
-- [ ] Экран 3: результат с нормами права
+**Архитектурные решения:**
+- Позиционная замена с конца текста → корректные индексы при множественных заменах
+- BANK_ACCOUNT (20 цифр) проверяется до INN (10-12 цифр) в ALL_PATTERNS
+- DRIVERS_LICENSE и VEHICLE_PASSPORT не имеют regex (формат совпадает с PASSPORT/VEHICLE_REGISTRATION) — LLM различает по контексту
+- degraded=True если LLM вернула пустой список при use_llm=True
 
-### Фаза 3 — Legal Engine 🔲
-- [ ] Клиент API КонсультантПлюс
-- [ ] Извлечение поисковых запросов через LLM
-- [ ] Парсинг ответа
-
-### Фаза 4 — Сборка 🔲
-- [ ] Полный цикл: текст → справка
-- [ ] Полировка UI
-- [ ] Документация для пользователя
-
----
-
-## Известные проблемы
-- Нет пока
-
-## Решения принятые ранее
-- **UI:** Flask + Jinja2 + Pico CSS (не Streamlit, не React)
-- **LLM:** Ollama + Llama 3.1 8B / Saiga (локально, без сети)
-- **Вход:** простой текст (не файлы, без OCR)
-- **Legal API:** абстракция через Protocol, сейчас КонсультантПлюс
-
-## Как продолжить работу
-1. Открой Claude Code в корне репо
-2. Claude автоматически прочитает CLAUDE.md
-3. Посмотри раздел «Следующая фаза» выше
-4. Используй /plan перед реализацией
-5. После завершения обнови этот файл и CHANGELOG.md
+**Следующий шаг (Шаг 3):** Web UI — Flask-эндпоинты, формы ввода/проверки замен, интеграция с AnonymizationResult.
