@@ -56,7 +56,12 @@ class DetectedSpan(BaseModel):
     entity_type: EntityType
     start: int
     end: int
-    source: Literal["regex", "llm"]
+    source: Literal["regex", "llm", "manual"]
+
+    @property
+    def span_id(self) -> str:
+        """Стабильный идентификатор вхождения для HTML-форм."""
+        return f"{self.start}:{self.end}:{self.source}:{self.entity_type}"
 
 
 class AnonymizationResult(BaseModel):

@@ -12,7 +12,7 @@
 - Все __init__.py, заглушки модулей
 - 13 базовых тестов — зелёные
 
-## Фаза 1: Anonymizer — В ПРОЦЕССЕ
+## Фаза 1: Anonymizer — ЗАВЕРШЕНА
 
 ### Шаг 2: Typed Anonymizer — ЗАВЕРШЁН
 
@@ -36,4 +36,71 @@
 - DRIVERS_LICENSE и VEHICLE_PASSPORT не имеют regex (формат совпадает с PASSPORT/VEHICLE_REGISTRATION) — LLM различает по контексту
 - degraded=True если LLM вернула пустой список при use_llm=True
 
-**Следующий шаг (Шаг 3):** Web UI — Flask-эндпоинты, формы ввода/проверки замен, интеграция с AnonymizationResult.
+### Шаг 3: Web UI + Review Gate — ЗАВЕРШЁН
+
+**Файлы созданы/изменены:**
+- `src/legaldesk/anonymizer/models.py` — добавлен `source="manual"`, свойство `span_id`
+- `src/legaldesk/web/session_store.py` — SessionStore (in-memory, TTL, opaque UUID)
+- `src/legaldesk/legal_engine/stub_provider.py` — StubProvider (5 хардкоженных норм по ДТП)
+- `src/legaldesk/web/app.py` — create_app() factory, 6 маршрутов (/, /anonymize, /review, /approve, /result, /new)
+- `src/legaldesk/web/static/pico.min.css` — локальная копия Pico CSS (CDN запрещён CONSTITUTION Art 4.3)
+- `src/legaldesk/web/static/style.css` — .columns, mark.pdn, mark.token, .warning-banner, .error, .result-card, .text-display
+- `src/legaldesk/web/templates/base.html` — CDN → локальный pico.min.css
+- `src/legaldesk/web/templates/input.html` — ошибка + text_value, форма → /anonymize
+- `src/legaldesk/web/templates/review.html` — две колонки, таблица span'ов, ручная замена, degraded_confirm
+- `src/legaldesk/web/templates/result.html` — две колонки: исходный текст + карточки результатов
+
+**Тесты:**
+- `tests/test_session_store.py` — 7 тестов (create/get, expired, delete, update, cleanup)
+- `tests/test_stub_provider.py` — 2 теста (returns_list, title+snippet)
+- `tests/test_web.py` — 13 тестов (полный цикл, degraded, cookie PII, CDN, new clears session)
+
+**Архитектурные решения:**
+- Server-side session store: ПДн только в памяти сервера, в cookie — opaque UUID
+- span_id = `{start}:{end}:{source}:{entity_type}` — стабильный идентификатор для HTML-форм
+- StubProvider реализует LegalSearchProvider Protocol (duck typing)
+- `_compute_approved_text()` фильтрует span'ы по выбранным checkbox'ам + поддержка manual span
+- Замена из конца текста (reverse=True по start) для корректных индексов
+
+## Фаза 4: Сборка, полировка, premium UI — ЗАВЕРШЕНА
+
+**Файлы созданы/изменены:**
+- `src/legaldesk/logging_config.py` — setup_logging() идемпотентная настройка, StreamHandler, INFO
+- `src/legaldesk/web/helpers.py` — highlight_spans(), highlight_tokens() (markupsafe, XSS-safe)
+- `src/legaldesk/web/app.py` — полная переработка:
+  - SECRET_KEY из env LEGALDESK_SECRET_KEY, fallback secrets.token_hex(32) + WARNING
+  - MAX_CONTENT_LENGTH = 100KB
+  - /health endpoint (JSON, проверка Ollama API)
+  - Обработка ошибок: пустой текст, >50000 символов, exception в anonymize()/search()
+  - errorhandler(404), errorhandler(500) → error.html
+  - Логирование (кол-ва, статусы — без ПДн)
+  - Использует helpers.py вместо inline _annotate_*
+- `src/legaldesk/web/static/style.css` — полностью новая дизайн-система:
+  - CSS custom properties (цвета, шрифты, тени, радиусы)
+  - Компоненты: .app-header, .card, .btn, .textarea, .split-view, .replacements-table
+  - mark.pdn/token/manual, .badge--regex/llm/manual, .alert--warning/danger/success
+  - .step-indicator (трёхшаговый wizard), .stats-bar, .result-card, .manual-add
+  - .spinner, .empty-state, .error-page, .app-footer
+  - @media print
+- `src/legaldesk/web/static/pico.min.css` — УДАЛЁН (свой CSS вместо Pico)
+- `src/legaldesk/web/templates/base.html` — header с лого + навигация, footer с версией
+- `src/legaldesk/web/templates/input.html` — step-indicator (шаг 1), card, alert для ошибок
+- `src/legaldesk/web/templates/review.html` — step-indicator (шаг 2), stats-bar, split-view, replacements-table с badges, manual-add, degraded checkbox
+- `src/legaldesk/web/templates/result.html` — step-indicator (шаг 3), split-view с result-cards, empty-state
+- `src/legaldesk/web/templates/error.html` — универсальная страница ошибки (404, 500)
+- `Makefile` — добавлен make check, обновлён make run (host + port)
+- `README.md` — конфигурация, первый запуск, как работает, degraded режим
+
+**Тесты:**
+- `tests/test_highlight.py` — 5 тестов (highlight_spans, XSS escape, empty, tokens, token XSS)
+- `tests/test_web.py` — 9 новых тестов (health JSON, health Ollama unavailable, text too long, empty whitespace, anonymize exception, 404 page, navigation, no CDN, cookie flags)
+- Итого: 95 тестов, покрытие 92%
+
+**Архитектурные решения:**
+- Полностью свой CSS — никаких внешних зависимостей (CDN, шрифты, библиотеки)
+- helpers.py вынесен из app.py для чистого разделения
+- setup_logging() вызывается в create_app(), идемпотентно
+- В логах НИКОГДА нет ПДн — только кол-ва и флаги
+- Трёхшаговый step-indicator показывает прогресс юристу
+
+**Статус:** MVP готов. make lint && make test зелёные. 95 тестов, 92% покрытия.
