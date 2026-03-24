@@ -1,1 +1,58 @@
 /* LegalDesk — дополнительные стили */
+
+.columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+mark.pdn {
+    background-color: #ffe082;
+    padding: 0.1em 0.2em;
+    border-radius: 3px;
+}
+
+mark.token {
+    background-color: #b3e5fc;
+    padding: 0.1em 0.2em;
+    border-radius: 3px;
+    font-family: monospace;
+}
+
+.warning-banner {
+    background-color: #fff3cd;
+    border: 1px solid #ffc107;
+    color: #856404;
+    padding: 0.75rem 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+.error {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.result-card {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.result-card h4 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+}
+
+.text-display {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 1rem;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 400px;
+    overflow-y: auto;
+}

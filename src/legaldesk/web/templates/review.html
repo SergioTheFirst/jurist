@@ -2,4 +2,88 @@
 {% block title %}Проверка замен — LegalDesk{% endblock %}
 {% block content %}
 <h2>Проверка замен</h2>
+
+{% if degraded %}
+<div class="warning-banner">
+    ⚠ LLM недоступна. Анонимизация выполнена только regex-паттернами.
+    Внимательно проверьте замены вручную.
+</div>
+{% endif %}
+
+{% if error %}
+<p class="error">{{ error }}</p>
+{% endif %}
+
+<form method="post" action="/approve">
+<div class="columns">
+    <div>
+        <h3>Исходный текст</h3>
+        <div class="text-display">{{ original_html }}</div>
+    </div>
+    <div>
+        <h3>Анонимизированный текст</h3>
+        <div class="text-display">{{ anonymized_html }}</div>
+    </div>
+</div>
+
+<h3>Обнаруженные ПДн</h3>
+<table>
+    <thead>
+        <tr>
+            <th><input type="checkbox" id="select-all" checked></th>
+            <th>Текст</th>
+            <th>Тип</th>
+            <th>Источник</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for span in spans %}
+        <tr>
+            <td>
+                <input type="checkbox" name="selected_span_ids"
+                       value="{{ span.span_id }}" checked>
+            </td>
+            <td>{{ span.text }}</td>
+            <td>{{ span.entity_type.value }}</td>
+            <td>{{ span.source }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<details>
+    <summary>Добавить замену вручную</summary>
+    <fieldset>
+        <label>Текст для замены
+            <input type="text" name="manual_text" placeholder="Введите фрагмент текста">
+        </label>
+        <label>Тип ПДн
+            <select name="manual_type">
+                <option value="">— выберите —</option>
+                {% for et in entity_types %}
+                <option value="{{ et }}">{{ et }}</option>
+                {% endfor %}
+            </select>
+        </label>
+    </fieldset>
+</details>
+
+{% if degraded %}
+<label>
+    <input type="checkbox" name="degraded_confirm">
+    Я проверил(а) замены вручную и подтверждаю корректность
+</label>
+{% endif %}
+
+<button type="submit">Отправить на анализ</button>
+</form>
+
+<script>
+document.getElementById("select-all").addEventListener("change", function() {
+    var checked = this.checked;
+    document.querySelectorAll('input[name="selected_span_ids"]').forEach(function(cb) {
+        cb.checked = checked;
+    });
+});
+</script>
 {% endblock %}

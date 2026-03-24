@@ -1,0 +1,20 @@
+/* Pico CSS v2 minimal — local copy (CDN unavailable in this env) */
+*,::after,::before{box-sizing:border-box}
+:root{--font-size:16px;--line-height:1.5;--font-family:system-ui,-apple-system,"Segoe UI",sans-serif;--border-radius:.25rem;--color:#373c44;--background-color:#fff;--primary:#1095c1;--primary-hover:#0d7fa1;--muted-color:#646b79;--muted-border-color:#dee2e6;--card-background-color:#fff;--card-border-color:#dee2e6}
+html{font-size:var(--font-size);line-height:var(--line-height);font-family:var(--font-family);color:var(--color);background-color:var(--background-color)}
+body{margin:0}
+.container{max-width:1200px;margin:0 auto;padding:0 1rem}
+h1,h2,h3,h4{margin:0 0 .5rem;font-weight:700;line-height:1.2}
+h1{font-size:2rem}h2{font-size:1.5rem}h3{font-size:1.25rem}h4{font-size:1rem}
+p{margin:0 0 1rem}
+a{color:var(--primary)}
+button,[type=submit]{display:inline-block;padding:.5rem 1rem;font-size:1rem;line-height:1.5;border:none;border-radius:var(--border-radius);cursor:pointer;background:var(--primary);color:#fff}
+button:hover{background:var(--primary-hover)}
+input[type=text],input[type=email],textarea,select{display:block;width:100%;padding:.5rem .75rem;font-size:1rem;line-height:1.5;border:1px solid var(--muted-border-color);border-radius:var(--border-radius);background:#fff}
+textarea{min-height:120px;resize:vertical}
+table{width:100%;border-collapse:collapse;margin-bottom:1rem}
+th,td{padding:.5rem .75rem;border:1px solid var(--muted-border-color);text-align:left;font-size:.9rem}
+th{background:#f8f9fa;font-weight:600}
+label{display:inline-block;margin-bottom:.25rem}
+small{font-size:.875rem;color:var(--muted-color)}
+article{border:1px solid var(--card-border-color);border-radius:var(--border-radius);padding:1rem;margin-bottom:.75rem;background:var(--card-background-color)}

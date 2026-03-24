@@ -36,4 +36,30 @@
 - DRIVERS_LICENSE и VEHICLE_PASSPORT не имеют regex (формат совпадает с PASSPORT/VEHICLE_REGISTRATION) — LLM различает по контексту
 - degraded=True если LLM вернула пустой список при use_llm=True
 
-**Следующий шаг (Шаг 3):** Web UI — Flask-эндпоинты, формы ввода/проверки замен, интеграция с AnonymizationResult.
+### Шаг 3: Web UI + Review Gate — ЗАВЕРШЁН
+
+**Файлы созданы/изменены:**
+- `src/legaldesk/anonymizer/models.py` — добавлен `source="manual"`, свойство `span_id`
+- `src/legaldesk/web/session_store.py` — SessionStore (in-memory, TTL, opaque UUID)
+- `src/legaldesk/legal_engine/stub_provider.py` — StubProvider (5 хардкоженных норм по ДТП)
+- `src/legaldesk/web/app.py` — create_app() factory, 6 маршрутов (/, /anonymize, /review, /approve, /result, /new)
+- `src/legaldesk/web/static/pico.min.css` — локальная копия Pico CSS (CDN запрещён CONSTITUTION Art 4.3)
+- `src/legaldesk/web/static/style.css` — .columns, mark.pdn, mark.token, .warning-banner, .error, .result-card, .text-display
+- `src/legaldesk/web/templates/base.html` — CDN → локальный pico.min.css
+- `src/legaldesk/web/templates/input.html` — ошибка + text_value, форма → /anonymize
+- `src/legaldesk/web/templates/review.html` — две колонки, таблица span'ов, ручная замена, degraded_confirm
+- `src/legaldesk/web/templates/result.html` — две колонки: исходный текст + карточки результатов
+
+**Тесты:**
+- `tests/test_session_store.py` — 7 тестов (create/get, expired, delete, update, cleanup)
+- `tests/test_stub_provider.py` — 2 теста (returns_list, title+snippet)
+- `tests/test_web.py` — 13 тестов (полный цикл, degraded, cookie PII, CDN, new clears session)
+
+**Архитектурные решения:**
+- Server-side session store: ПДн только в памяти сервера, в cookie — opaque UUID
+- span_id = `{start}:{end}:{source}:{entity_type}` — стабильный идентификатор для HTML-форм
+- StubProvider реализует LegalSearchProvider Protocol (duck typing)
+- `_compute_approved_text()` фильтрует span'ы по выбранным checkbox'ам + поддержка manual span
+- Замена из конца текста (reverse=True по start) для корректных индексов
+
+**Следующий шаг (Шаг 4):** Интеграция с реальным API КонсультантПлюс, consultant_plus.py.

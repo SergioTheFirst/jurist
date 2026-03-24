@@ -2,8 +2,11 @@
 {% block title %}Ввод обращения — LegalDesk{% endblock %}
 {% block content %}
 <h2>Ввод текста обращения</h2>
-<form method="post" action="/">
-    <textarea name="text" rows="10" placeholder="Вставьте текст обращения..."></textarea>
+{% if error %}
+<p class="error">{{ error }}</p>
+{% endif %}
+<form method="post" action="/anonymize">
+    <textarea name="text" rows="12" placeholder="Вставьте текст обращения...">{{ text_value }}</textarea>
     <button type="submit">Анонимизировать</button>
 </form>
 {% endblock %}
