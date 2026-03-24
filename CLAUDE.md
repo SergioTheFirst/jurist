@@ -10,7 +10,7 @@
 - `src/legaldesk/web/` — Flask + Jinja2, простой Web UI на localhost
 
 ## Стек
-- Python 3.11+
+- Python 3.10+
 - Flask + Jinja2 + Pico CSS (UI)
 - Ollama localhost:11434 (локальная LLM)
 - pytest + pytest-cov (тесты)

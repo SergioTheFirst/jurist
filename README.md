@@ -69,5 +69,5 @@ make check      # lint + test + статус
 
 ## Требования
 
-- Python 3.11+
+- Python 3.10+
 - Ollama (опционально, для LLM-анонимизации)
