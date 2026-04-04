@@ -1,0 +1,5 @@
+-r requirements.txt
+PyInstaller>=6.6.0
+jaraco.text>=4.2.0
+jaraco.context>=6.1.2
+jaraco.functools>=4.4.0
