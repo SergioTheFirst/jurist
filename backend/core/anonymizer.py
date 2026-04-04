@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from natasha import Doc, MorphVocab, NamesExtractor, NewsEmbedding, NewsMorphTagger, NewsNERTagger, Segmenter
 
+from backend.core.dict_detector import DictSpan, detect_names, detect_vehicles
 from backend.core.entity_rules import EntityRuleLayer
 from backend.core.entity_rules.common import canonicalize_org_name, clean_entity_text, normalize_entity_text
 from backend.core.entity_rules.models import EntitySpan, ReviewCandidate
@@ -46,6 +47,44 @@ _PATTERN_SPECS: tuple[_PatternSpec, ...] = (
     _PatternSpec("ОГРН", re.compile(r"\bОГРН[:\s]*\d{13,15}\b", re.IGNORECASE)),
     _PatternSpec("ИНН", re.compile(r"\bИНН[:\s]*\d{10,12}\b", re.IGNORECASE)),
     _PatternSpec("СНИЛС", re.compile(r"\b\d{3}[-\s]?\d{3}[-\s]?\d{3}[-\s]?\d{2}\b")),
+    # Госномер прицепа: АА1234 77
+    _PatternSpec(
+        "ПРИЦЕП_НОМЕР",
+        re.compile(r"\b[АВЕКМНОРСТУХABEKMHOPCTYX]{2}\d{4}\s?\d{2,3}\b"),
+    ),
+    # Госномер мотоцикла: 1234АА77
+    _PatternSpec(
+        "МОТО_НОМЕР",
+        re.compile(r"\b\d{4}\s?[АВЕКМНОРСТУХABEKMHOPCTYX]{2}\s?\d{2,3}\b"),
+    ),
+    # Дата словесная: «12 января 2021 года»
+    _PatternSpec(
+        "ДАТА",
+        re.compile(
+            r"\b(?:0?[1-9]|[12]\d|3[01])\s+"
+            r"(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)"
+            r"\s+(?:19|20)\d{2}(?:\s+г(?:ода?|\.))?",
+            re.IGNORECASE,
+        ),
+    ),
+    # Дата в формате ДД.ММ.ГГГГ
+    _PatternSpec(
+        "ДАТА",
+        re.compile(r"\b(?:0?[1-9]|[12]\d|3[01])[.\-/](?:0?[1-9]|1[0-2])[.\-/](?:19|20)\d{2}\b"),
+    ),
+    # Номер дела: А40-12345/2020
+    _PatternSpec(
+        "НОМЕР_ДЕЛА",
+        re.compile(r"\b(?:[А-Я]\d{2}-\d+/\d{4}|\d{1,2}-\d+/\d{2,4}|\d{2}[А-Я]{2}-\d+/\d{4})\b"),
+    ),
+    # Инициалы: Иванов И.И.
+    _PatternSpec(
+        "ФИО_ИНИЦИАЛЫ",
+        re.compile(
+            r"\b[А-ЯЁ][а-яё]+\s+[А-ЯЁ]\.[А-ЯЁ]\."
+            r"|\b[А-ЯЁ]\.[А-ЯЁ]\.\s+[А-ЯЁ][а-яё]+"
+        ),
+    ),
     _PatternSpec(
         "ТЕЛЕФОН",
         re.compile(r"(?:\+7|8)[\s\-]?\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}"),
@@ -120,6 +159,7 @@ class Anonymizer:
         "ТЕЛЕФОН": "[ТЕЛЕФОН]",
         "EMAIL": "[EMAIL]",
         "ДАТА_РОЖДЕНИЯ": "[ДАТА РОЖДЕНИЯ]",
+        "ДАТА": "[ДАТА]",
         "ОГРН": "[ОГРН]",
         "АДРЕС": "[АДРЕС]",
         "БАНК_СЧЁТ": "[БАНК. СЧЁТ]",
@@ -127,8 +167,13 @@ class Anonymizer:
         "БИК": "[БИК]",
         "VIN": "[VIN]",
         "ГОСНОМЕР": "[ГОСНОМЕР]",
+        "ПРИЦЕП_НОМЕР": "[ПРИЦЕП НОМЕР]",
+        "МОТО_НОМЕР": "[МОТО НОМЕР]",
         "ПОЛИС": "[СТРАХ. ПОЛИС]",
         "СТС": "[СТС]",
+        "МАРКА_ТС": "[МАРКА/МОДЕЛЬ ТС]",
+        "НОМЕР_ДЕЛА": "[№ ДЕЛА]",
+        "ФИО_ИНИЦИАЛЫ": "[ФИО]",
     }
 
     def __init__(self) -> None:
@@ -152,6 +197,7 @@ class Anonymizer:
         candidates: list[_CandidateSpan] = []
 
         candidates.extend(self._collect_ner_candidates(text, warnings, whitelist_skipped, review_candidates))
+        candidates.extend(self._collect_dict_candidates(text))
         candidates.extend(self._collect_regex_candidates(text))
 
         resolved = self._resolve_overlaps(candidates)
@@ -251,6 +297,23 @@ class Anonymizer:
 
         return self._rule_layer.refine_candidates(text, candidates, warnings, whitelist_skipped, review_candidates)
 
+    def _collect_dict_candidates(self, text: str) -> list[_CandidateSpan]:
+        """Detect vehicles (brand/model) and regional names via offline dictionaries."""
+        all_dict_spans: list[DictSpan] = list(detect_vehicles(text)) + list(detect_names(text))
+        return [
+            _CandidateSpan(
+                id=span.id,
+                original=span.original,
+                placeholder=self.PLACEHOLDER.get(span.entity_type, f"[{span.entity_type}]"),
+                entity_type=span.entity_type,
+                start=span.start,
+                end=span.end,
+                source="dict",
+                confidence=span.confidence,
+            )
+            for span in all_dict_spans
+        ]
+
     def _collect_regex_candidates(self, text: str) -> list[_CandidateSpan]:
         candidates: list[_CandidateSpan] = []
 
@@ -276,9 +339,12 @@ class Anonymizer:
         if not candidates:
             return []
 
+        # Приоритет источников: ner(0) > dict(1) > regex(2)
+        _source_priority = {"ner": 0, "dict": 1, "regex": 2}
+
         def sort_key(candidate: _CandidateSpan) -> tuple[int, int, int]:
             coverage = candidate.end - candidate.start
-            source_priority = 0 if candidate.source == "regex" else 1
+            source_priority = _source_priority.get(candidate.source, 3)
             return (candidate.start, -coverage, source_priority)
 
         accepted: list[_CandidateSpan] = []
@@ -308,8 +374,12 @@ class Anonymizer:
 
         if candidate_coverage != incumbent_coverage:
             return candidate_coverage > incumbent_coverage
-        if candidate.source != incumbent.source:
-            return candidate.source == "regex"
+        # При равном покрытии выигрывает источник с более высоким приоритетом: ner > dict > regex
+        _priority = {"ner": 0, "dict": 1, "regex": 2}
+        candidate_prio = _priority.get(candidate.source, 3)
+        incumbent_prio = _priority.get(incumbent.source, 3)
+        if candidate_prio != incumbent_prio:
+            return candidate_prio < incumbent_prio
         return candidate.confidence > incumbent.confidence
 
     def _render_replacements(
