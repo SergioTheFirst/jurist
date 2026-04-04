@@ -39,6 +39,7 @@ def _render_review_page(result: AnonymizationResult, error: str = "") -> str:
     highlighted_anonymized = highlight_tokens(result.anonymized_text)
 
     regex_count = sum(1 for s in result.spans if s.source == "regex")
+    dict_count = sum(1 for s in result.spans if s.source == "dict")
     llm_count = sum(1 for s in result.spans if s.source == "llm")
 
     return render_template(
@@ -51,6 +52,7 @@ def _render_review_page(result: AnonymizationResult, error: str = "") -> str:
         entity_types=[et.value for et in EntityType],
         error=error,
         regex_count=regex_count,
+        dict_count=dict_count,
         llm_count=llm_count,
     )
 
