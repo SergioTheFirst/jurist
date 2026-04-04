@@ -84,7 +84,7 @@
     .topbar {
       position: relative;
       display: grid;
-      grid-template-columns: 32px minmax(0, 1fr) auto;
+      grid-template-columns: auto 32px minmax(0, 1fr) auto;
       align-items: center;
       gap: 16px;
       height: var(--header-h);
@@ -1415,6 +1415,7 @@
   <div class="app">
     <div class="width-warning">Интерфейс рассчитан на рабочую ширину от 1400px. Для корректной плотности данных увеличьте окно.</div>
     <header class="topbar">
+      <span style="font-size:12px;color:var(--text-dim);white-space:nowrap;">mss777@mail.ru</span>
       <div class="brand" aria-label="LegalDesk">
         <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 3 7l9 4 9-4-9-4Zm0 7v8m-6-5v2c0 2.6 2.7 4.5 6 4.5s6-1.9 6-4.5v-2" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
