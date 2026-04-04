@@ -20,10 +20,12 @@ def resolve_overlaps(spans: list[DetectedSpan]) -> list[DetectedSpan]:
     if not spans:
         return []
 
-    # Сортируем по start, затем по убыванию покрытия, затем LLM > regex
+    # Сортируем по start, затем по убыванию покрытия, затем LLM > dict > regex
+    source_priority_map = {"llm": 0, "dict": 1, "regex": 2, "manual": 0}
+
     def sort_key(s: DetectedSpan) -> tuple[int, int, int]:
         coverage = s.end - s.start
-        source_priority = 0 if s.source == "llm" else 1
+        source_priority = source_priority_map.get(s.source, 3)
         return (s.start, -coverage, source_priority)
 
     sorted_spans = sorted(spans, key=sort_key)
@@ -59,6 +61,9 @@ def _find_conflict(accepted: list[DetectedSpan], candidate: DetectedSpan) -> int
     return -1
 
 
+_PRIORITY_MAP: dict[str, int] = {"llm": 0, "dict": 1, "regex": 2, "manual": 0}
+
+
 def _llm_beats(a: DetectedSpan, b: DetectedSpan) -> bool:
-    """Истина, если a является LLM-источником, а b — regex."""
-    return a.source == "llm" and b.source == "regex"
+    """Истина, если a имеет более высокий приоритет источника, чем b."""
+    return _PRIORITY_MAP.get(a.source, 3) < _PRIORITY_MAP.get(b.source, 3)

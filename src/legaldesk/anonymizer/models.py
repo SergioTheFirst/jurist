@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import sys
 from enum import Enum
+from typing import Literal
+
+from pydantic import BaseModel
 
 if sys.version_info >= (3, 11):
     from enum import StrEnum
@@ -14,9 +17,6 @@ else:
         def __str__(self) -> str:
             """Return the string value."""
             return str(self.value)
-from typing import Literal
-
-from pydantic import BaseModel
 
 
 class EntityType(StrEnum):
@@ -25,6 +25,7 @@ class EntityType(StrEnum):
     # Персональные
     PERSON = "PERSON"
     DATE_OF_BIRTH = "DATE_OF_BIRTH"
+    DATE = "DATE"
     ADDRESS = "ADDRESS"
 
     # Документы личности
@@ -40,9 +41,12 @@ class EntityType(StrEnum):
 
     # Транспортное средство
     LICENSE_PLATE = "LICENSE_PLATE"
+    TRAILER_PLATE = "TRAILER_PLATE"
+    MOTORCYCLE_PLATE = "MOTORCYCLE_PLATE"
     VIN = "VIN"
     VEHICLE_BODY_NUMBER = "VEHICLE_BODY_NUMBER"
     ENGINE_NUMBER = "ENGINE_NUMBER"
+    VEHICLE_MAKE_MODEL = "VEHICLE_MAKE_MODEL"
 
     # Документы на ТС
     VEHICLE_REGISTRATION = "VEHICLE_REGISTRATION"
@@ -67,7 +71,7 @@ class DetectedSpan(BaseModel):
     entity_type: EntityType
     start: int
     end: int
-    source: Literal["regex", "llm", "manual"]
+    source: Literal["regex", "llm", "manual", "dict"]
 
     @property
     def span_id(self) -> str:

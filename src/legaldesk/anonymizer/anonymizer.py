@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from legaldesk.anonymizer.config import AnonymizerConfig
+from legaldesk.anonymizer.dict_detector import detect_names, detect_vehicles
 from legaldesk.anonymizer.llm_client import OllamaClient
 from legaldesk.anonymizer.mapping import TokenMapping
 from legaldesk.anonymizer.models import AnonymizationResult, DetectedSpan
@@ -29,15 +30,18 @@ def anonymize(
     # Шаг 1: regex-детекция
     regex_spans = _detect_with_regex(text)
 
-    # Шаг 2: LLM-детекция
+    # Шаг 2: словарная детекция (офлайн, без сети)
+    dict_spans = _detect_with_dicts(text)
+
+    # Шаг 3: LLM-детекция
     llm_spans: list[DetectedSpan] = []
     degraded = False
     if config.use_llm:
         client = OllamaClient(config)
         llm_spans, degraded = client.detect(text)
 
-    # Шаг 3: объединение и устранение перекрытий
-    all_spans = resolve_overlaps(regex_spans + llm_spans)
+    # Шаг 4: объединение и устранение перекрытий (LLM > dict > regex)
+    all_spans = resolve_overlaps(regex_spans + dict_spans + llm_spans)
 
     # Шаг 4: генерация токенов и замена (с конца текста, чтобы не сдвигать индексы)
     original_to_token: dict[str, str] = {}
@@ -101,6 +105,11 @@ def anonymize_with_regex(text: str) -> tuple[str, TokenMapping]:
         result = result[: span.start] + token + result[span.end :]
 
     return result, mapping
+
+
+def _detect_with_dicts(text: str) -> list[DetectedSpan]:
+    """Запустить словарную детекцию и вернуть список DetectedSpan."""
+    return detect_vehicles(text) + detect_names(text)
 
 
 def _detect_with_regex(text: str) -> list[DetectedSpan]:
