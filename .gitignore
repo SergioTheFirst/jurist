@@ -1,9 +1,18 @@
-__pycache__/
-*.pyc
-*.egg-info/
-dist/
-build/
-.coverage
-.mypy_cache/
-.pytest_cache/
-.ruff_cache/
+```
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+
+# Original rules preserved
+*.log
+```
