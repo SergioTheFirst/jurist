@@ -1,4 +1,4 @@
-"""Windows desktop launcher for bundled LegalDesk builds."""
+"""Cross-platform desktop launcher for bundled LegalDesk builds."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ from argparse import ArgumentParser, Namespace
 from datetime import datetime
 import os
 from pathlib import Path
+import platform
 import subprocess
 import sys
 import time
@@ -21,6 +22,21 @@ from backend.runtime_paths import runtime_data_root
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
 STARTUP_TIMEOUT = 25.0
+
+
+def get_platform() -> str:
+    """Return the current platform identifier."""
+    return platform.system().lower()
+
+
+def is_macos() -> bool:
+    """Check if running on macOS."""
+    return get_platform() == "darwin"
+
+
+def is_windows() -> bool:
+    """Check if running on Windows."""
+    return get_platform() == "windows"
 
 
 def logs_dir(data_dir: Path | None = None) -> Path:
@@ -145,9 +161,14 @@ def launch_server_process(host: str, port: int, data_dir: Path | None) -> subpro
         "stdout": server_log_handle,
         "stderr": server_log_handle,
     }
-    if os.name == "nt":
+    
+    # Platform-specific process creation flags
+    if is_windows():
         creationflags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         popen_kwargs["creationflags"] = creationflags
+    elif is_macos():
+        # On macOS, use start_new_session to detach the process
+        popen_kwargs["start_new_session"] = True
 
     return subprocess.Popen(command, **popen_kwargs)
 

@@ -1,18 +1,66 @@
 ```
+# Build artifacts
+dist/
+build/
+*.spec
+*.app/
+*.dmg
+*.pkg
+*.zip
+
+# Dependencies
+.venv/
+venv/
+env/
+node_modules/
+
 # Logs and temp files
 *.log
 *.tmp
-*.swp
+*.temp
+*.bak
 
 # Environment
 .env
 .env.local
-*.env.*
+.env.*
 
 # Editors
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# Original rules preserved
-*.log
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+.coverage
+coverage/
+htmlcov/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Testing
+.pytest_cache/
+.mypy_cache/
+.tox/
+
+# Distribution / packaging
+*.egg-info/
+.eggs/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# macOS packaging
+*.mpkg
+*.app
+*.pkg
 ```
