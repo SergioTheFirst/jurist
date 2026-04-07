@@ -1,9 +1,66 @@
-__pycache__/
-*.pyc
-*.egg-info/
+```
+# Build artifacts
 dist/
 build/
+*.spec
+*.app/
+*.dmg
+*.pkg
+*.zip
+
+# Dependencies
+.venv/
+venv/
+env/
+node_modules/
+
+# Logs and temp files
+*.log
+*.tmp
+*.temp
+*.bak
+
+# Environment
+.env
+.env.local
+.env.*
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
 .coverage
-.mypy_cache/
+coverage/
+htmlcov/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Testing
 .pytest_cache/
-.ruff_cache/
+.mypy_cache/
+.tox/
+
+# Distribution / packaging
+*.egg-info/
+.eggs/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# macOS packaging
+*.mpkg
+*.app
+*.pkg
+```
