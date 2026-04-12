@@ -6,6 +6,7 @@ from dataclasses import replace
 from typing import Iterable, Mapping
 
 from backend.core.entity_rules.common import clean_entity_text, normalize_entity_text, prefer_best
+from backend.core.entity_rules.loc_rules import LocationRuleEngine
 from backend.core.entity_rules.models import EntitySpan, ReviewCandidate, RuleDecision
 from backend.core.entity_rules.org_rules import OrganizationRuleEngine
 from backend.core.entity_rules.per_rules import PersonRuleEngine
@@ -21,6 +22,9 @@ class EntityRuleLayer:
     def __init__(self, placeholders: Mapping[str, str]) -> None:
         self._person_rules = PersonRuleEngine(placeholders["PER"])
         self._organization_rules = OrganizationRuleEngine(placeholders["ORG"])
+        self._location_rules = LocationRuleEngine(
+            placeholders.get("АДРЕС", placeholders.get("LOC", "[АДРЕС]"))
+        )
 
     def refine_candidates(
         self,
@@ -56,6 +60,18 @@ class EntityRuleLayer:
                     text=text,
                     candidate=decision_candidate,
                     decision=self._organization_rules.validate_candidate(text, decision_candidate),
+                    warnings=warnings,
+                    review_candidates=review_candidates,
+                )
+                if refined_candidate is not None:
+                    refined.append(refined_candidate)
+                continue
+            if candidate.entity_type in ("LOC", "АДРЕС"):
+                decision_candidate = self._location_rules.expand_candidate(text, candidate)
+                refined_candidate = self._accept_or_warn(
+                    text=text,
+                    candidate=decision_candidate,
+                    decision=self._location_rules.validate_candidate(text, decision_candidate),
                     warnings=warnings,
                     review_candidates=review_candidates,
                 )
@@ -126,7 +142,7 @@ class EntityRuleLayer:
         """Collect additional person and organization entities missed by NER."""
 
         supplemented: list[EntitySpan] = []
-        for engine in (self._organization_rules, self._person_rules):
+        for engine in (self._organization_rules, self._person_rules, self._location_rules):
             for candidate in engine.supplement_candidates(text, occupied):
                 cleaned = clean_entity_text(candidate.original)
                 if self._is_whitelisted(cleaned):

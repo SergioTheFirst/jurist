@@ -11,7 +11,16 @@ from natasha import Doc, MorphVocab, NamesExtractor, NewsEmbedding, NewsMorphTag
 
 from backend.core.dict_detector import DictSpan, detect_names, detect_vehicles
 from backend.core.entity_rules import EntityRuleLayer
+from backend.core.entity_rules.address_patterns import (
+    CITY_STREET_RE,
+    FULL_ADDRESS_RE,
+    POI_ADDRESS_RE,
+    POSTAL_CITY_RE,
+    PREFIXED_ADDRESS_RE,
+    PREPOSITIONAL_STREET_RE,
+)
 from backend.core.entity_rules.common import canonicalize_org_name, clean_entity_text, normalize_entity_text
+from backend.core.entity_rules.context_rules import ADDRESS_CONTEXT_WORDS, has_nearby_context
 from backend.core.entity_rules.models import EntitySpan, ReviewCandidate
 from backend.core.legal_terms import LEGAL_WHITELIST
 
@@ -103,18 +112,15 @@ _PATTERN_SPECS: tuple[_PatternSpec, ...] = (
         "ГОСНОМЕР",
         re.compile(r"\b[АВЕКМНОРСТУХABEKMHOPCTYX]\d{3}[АВЕКМНОРСТУХABEKMHOPCTYX]{2}\d{2,3}\b"),
     ),
-    _PatternSpec(
-        "АДРЕС",
-        re.compile(
-            r"(?:адрес[:\s]*)?"
-            r"(?:(?:г\.|город)\s+[А-ЯЁA-Za-z\- ]{2,40},?\s*)?"
-            r"(?:ул\.?|улица|проспект|пр-т|переулок|пер\.|наб\.|набережная|ш\.|шоссе)\s+"
-            r"[А-ЯЁA-Za-z0-9\- ]{2,40},?\s*"
-            r"(?:д\.?|дом)\s*\d+[А-Яа-яA-Za-z]?"
-            r"(?:,?\s*(?:кв\.?|квартира|офис|оф\.)\s*\d+[А-Яа-яA-Za-z]?)?",
-            re.IGNORECASE,
-        ),
-    ),
+    # Address detection uses composable primitives from `address_patterns.py`.
+    # Order matters only for stable iteration — `_resolve_overlaps` picks the
+    # widest match, so widest variants go first.
+    _PatternSpec("АДРЕС", FULL_ADDRESS_RE),
+    _PatternSpec("АДРЕС", PREFIXED_ADDRESS_RE),
+    _PatternSpec("АДРЕС", POSTAL_CITY_RE),
+    _PatternSpec("АДРЕС", CITY_STREET_RE),
+    _PatternSpec("АДРЕС", PREPOSITIONAL_STREET_RE),
+    _PatternSpec("АДРЕС", POI_ADDRESS_RE),
 )
 
 
@@ -152,7 +158,6 @@ class Anonymizer:
     PLACEHOLDER = {
         "PER": "[ФИО]",
         "ORG": "[ОРГАНИЗАЦИЯ]",
-        "LOC": "[АДРЕС]",
         "ПАСПОРТ": "[ПАСПОРТ]",
         "ИНН": "[ИНН]",
         "СНИЛС": "[СНИЛС]",
@@ -273,7 +278,7 @@ class Anonymizer:
                             metadata["name_fact"] = normalized_fact
 
             span_text = clean_entity_text(text[span.start:span.stop])
-            if span.type == "LOC" and self._should_skip_loc_candidate(span_text):
+            if span.type == "LOC" and self._should_skip_loc_candidate(text, span.start, span.stop, span_text):
                 continue
             if self._is_exact_whitelist_term(span_text):
                 if span_text and span_text not in whitelist_skipped:
@@ -281,12 +286,15 @@ class Anonymizer:
                     whitelist_skipped.append(span_text)
                 continue
 
+            # Unify LOC → АДРЕС so Natasha LOC candidates share the counter
+            # with regex-based address matches in `_render_replacements`.
+            canonical_type = "АДРЕС" if span.type == "LOC" else span.type
             candidates.append(
                 _CandidateSpan(
                     id=str(uuid4()),
                     original=span_text,
-                    placeholder=self.PLACEHOLDER[span.type],
-                    entity_type=span.type,
+                    placeholder=self.PLACEHOLDER[canonical_type],
+                    entity_type=canonical_type,
                     start=span.start,
                     end=span.stop,
                     source="ner",
@@ -441,14 +449,20 @@ class Anonymizer:
         return normalize_entity_text(value) in _NORMALIZED_WHITELIST
 
     @staticmethod
-    def _should_skip_loc_candidate(value: str) -> bool:
-        """Drop noisy Natasha LOC abbreviations that are not personal data."""
+    def _should_skip_loc_candidate(text: str, start: int, end: int, value: str) -> bool:
+        """Drop noisy Natasha LOC abbreviations that are not personal data.
+
+        Short uppercase acronyms (e.g. "РТ", "КБР") pass through when an
+        address-context word sits nearby — they're abbreviated subject names.
+        """
 
         normalized = normalize_entity_text(value)
-        if normalized in {"рф", "россия", "российская федерация"}:
+        if normalized in {"рф", "россия", "российская федерация", "ссср"}:
             return True
         stripped = value.strip()
-        return len(normalized) <= 3 and stripped.isupper()
+        if len(normalized) <= 3 and stripped.isupper():
+            return not has_nearby_context(text, start, end, ADDRESS_CONTEXT_WORDS)
+        return False
 
 
 anonymizer = Anonymizer()
