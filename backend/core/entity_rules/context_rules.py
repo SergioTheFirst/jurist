@@ -157,6 +157,26 @@ PERSON_CONTEXT_WORDS = {
     "явилась",
 }
 
+ADDRESS_CONTEXT_WORDS = {
+    "адрес",
+    "по адресу",
+    "адрес проживания",
+    "адрес регистрации",
+    "место жительства",
+    "по месту жительства",
+    "месторасположение",
+    "местонахождение",
+    "зарегистрирован",
+    "зарегистрирован по адресу",
+    "проживает",
+    "проживает по адресу",
+    "фактический адрес",
+    "юридический адрес",
+    "адрес доставки",
+    "прописан",
+    "домовладение",
+}
+
 PERSON_ALIAS_PREFIXES = (
     "гр",
     "гр-н",
@@ -225,6 +245,7 @@ GENERIC_LEGAL_LEMMAS = _lemma_set(GENERIC_LEGAL_TERMS)
 TABLE_HEADER_LEMMAS = _lemma_set(TABLE_HEADER_TERMS)
 ORG_KEYWORD_LEMMAS = _lemma_set(ORG_KEYWORDS)
 PERSON_CONTEXT_LEMMAS = _lemma_set(PERSON_CONTEXT_WORDS)
+ADDRESS_CONTEXT_LEMMAS = _lemma_set(ADDRESS_CONTEXT_WORDS)
 
 PERSON_STOPWORD_LEMMAS = (
     PROCEDURAL_ROLE_LEMMAS

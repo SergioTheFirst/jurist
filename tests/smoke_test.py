@@ -99,6 +99,31 @@ def test_anonymizer_insurance_policy() -> None:
     assert "[СТРАХ. ПОЛИС1]" in result.anonymized_text
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Заявитель проживает по адресу: 119019, г. Москва, ул. Арбат, д. 12, кв. 5.",
+        "Фактический адрес: Рязанская обл., Клепиковский р-н, дер. Ласково, д. 7.",
+        "Зарегистрирован по адресу: г. Волгоград, ул. им. Гагарина, д. 4.",
+        "Истец проживает: г. Москва, ул. 1-я Тверская-Ямская, д. 11, корп. 2.",
+    ],
+    ids=["full_address", "rural_address", "im_prefix", "compound_street"],
+)
+def test_anonymizer_address(text: str) -> None:
+    """Address candidates must be detected and replaced with [АДРЕС1]."""
+
+    from backend.core.anonymizer import anonymizer
+
+    result = anonymizer.anonymize(text)
+    assert "[АДРЕС1]" in result.anonymized_text, (
+        f"Expected [АДРЕС1] in anonymized text, got: {result.anonymized_text}"
+    )
+    addr_replacements = [r for r in result.replacements if r.entity_type in ("АДРЕС", "LOC")]
+    assert len(addr_replacements) >= 1, (
+        f"Expected at least one АДРЕС replacement, got: {result.replacements}"
+    )
+
+
 def test_numbered_placeholders_distinguish_and_reuse_same_type_entities() -> None:
     from backend.core.anonymizer import _CandidateSpan, anonymizer
 
@@ -1018,12 +1043,16 @@ def test_anonymizer_case_corpus_metrics() -> None:
 
     fixture_path = Path("tests/fixtures/anonymizer_cases.jsonl")
     rows = [json.loads(line) for line in fixture_path.read_text(encoding="utf-8-sig").splitlines() if line.strip()]
-    assert len(rows) >= 200
+    assert len(rows) >= 215
 
     metrics = {
         "PER": {"tp": 0, "fp": 0, "fn": 0},
         "ORG": {"tp": 0, "fp": 0, "fn": 0},
+        "АДРЕС": {"tp": 0, "fp": 0, "fn": 0},
     }
+
+    def _addr_key(value: str) -> str:
+        return normalize_entity_text(clean_entity_text(value))
 
     for row in rows:
         result = anonymizer.anonymize(row["text"])
@@ -1038,25 +1067,53 @@ def test_anonymizer_case_corpus_metrics() -> None:
                 for record in result.replacements
                 if record.entity_type == "ORG"
             },
+            "АДРЕС": {
+                _addr_key(record.original)
+                for record in result.replacements
+                if record.entity_type == "АДРЕС"
+            },
         }
 
-        for entity_type in ("PER", "ORG"):
-            expected = {
-                normalize_entity_text(clean_entity_text(item))
-                if entity_type == "PER"
-                else canonicalize_org_name(item)
-                for item in row["expected"][entity_type]
-            }
-            metrics[entity_type]["tp"] += len(found[entity_type] & expected)
-            metrics[entity_type]["fp"] += len(found[entity_type] - expected)
-            metrics[entity_type]["fn"] += len(expected - found[entity_type])
+        for entity_type in ("PER", "ORG", "АДРЕС"):
+            raw_expected = row["expected"].get(entity_type, [])
+            if entity_type == "PER":
+                expected = {normalize_entity_text(clean_entity_text(item)) for item in raw_expected}
+            elif entity_type == "ORG":
+                expected = {canonicalize_org_name(item) for item in raw_expected}
+            else:
+                expected = {_addr_key(item) for item in raw_expected}
+            # Address matching is substring-lenient — a detected address may
+            # include slightly more context than the fixture snapshot.
+            if entity_type == "АДРЕС":
+                matched_expected = set()
+                for exp in expected:
+                    if any(exp in det or det in exp for det in found[entity_type]):
+                        matched_expected.add(exp)
+                matched_found = set()
+                for det in found[entity_type]:
+                    if any(exp in det or det in exp for exp in expected):
+                        matched_found.add(det)
+                metrics[entity_type]["tp"] += len(matched_expected)
+                metrics[entity_type]["fp"] += len(found[entity_type] - matched_found)
+                metrics[entity_type]["fn"] += len(expected - matched_expected)
+            else:
+                metrics[entity_type]["tp"] += len(found[entity_type] & expected)
+                metrics[entity_type]["fp"] += len(found[entity_type] - expected)
+                metrics[entity_type]["fn"] += len(expected - found[entity_type])
 
     per_precision = metrics["PER"]["tp"] / (metrics["PER"]["tp"] + metrics["PER"]["fp"])
     per_recall = metrics["PER"]["tp"] / (metrics["PER"]["tp"] + metrics["PER"]["fn"])
     org_precision = metrics["ORG"]["tp"] / (metrics["ORG"]["tp"] + metrics["ORG"]["fp"])
     org_recall = metrics["ORG"]["tp"] / (metrics["ORG"]["tp"] + metrics["ORG"]["fn"])
+    addr_tp = metrics["АДРЕС"]["tp"]
+    addr_fp = metrics["АДРЕС"]["fp"]
+    addr_fn = metrics["АДРЕС"]["fn"]
+    addr_precision = addr_tp / (addr_tp + addr_fp) if (addr_tp + addr_fp) else 1.0
+    addr_recall = addr_tp / (addr_tp + addr_fn) if (addr_tp + addr_fn) else 1.0
 
     assert per_precision >= 0.93, metrics
     assert per_recall >= 0.9, metrics
     assert org_precision >= 0.93, metrics
     assert org_recall >= 0.9, metrics
+    assert addr_recall >= 0.8, metrics
+    assert addr_precision >= 0.85, metrics
